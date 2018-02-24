@@ -21,7 +21,7 @@ double complex y(int l, int m, double theta, double phii);
 double complex ystar(int l, int m, double theta, double phii);
 int odefunc (double x, const double *y, double *f,void *params);
 double rst2rsch (double rstar,double rsch,double rschm2m,double xm);
-void mesh (double xm,double width,double xmin, double xmax,double delx,double sourx,double *r0,int *im, int *imm, int *ismhf,int iwidth,double rsch0,double rstar0);
+void mesh (double xm,double width,double delrho,double *r0,int *im, int *imm, int *ismhf,int iwidth,double rsch0,double rstar0);
 void initdata (int im,int imm,double delx,double complex *z,double complex *phi,double complex *pi,double *xa);
 double vpotential (double rsch,double rschm2m,double xm,int lval);
 void laxwen(int im,int imm, double delx,double rcour, double dt, double complex *z, double complex *phi, double complex *pi,double *v,double complex zag,double complex zagp1,double complex phiag,double complex phiagp1,double complex piag,double complex piagp1,int isphf,int ismhf, double complex *za, double complex *zb, double complex *pia, double complex *pib, double complex *phib);
@@ -40,8 +40,9 @@ int main (void){
     int lmode;
 
     //would like to keep these variables defined locally in case any change is needed
-
-    double delx=0.03,rcour,sourx=10.0,xm=1.0,dt,rsch0=10.0;
+    //xm is black hole mass
+    double delrho=0.03;
+    double delx=0.03,rcour,xm=1.0,dt,rsch0=10.0;
     double width=500.0;
     int iwidth=floor(width/delx);
     //declares integer values
@@ -51,13 +52,15 @@ int main (void){
     double rstar0=rsch0+2*xm*log((rsch0-2*xm)/(2*xm));
     double xmin=rstar0-iwidth*delx;
     double xmax=rstar0+iwidth*delx;
+    horizon=xmin;
+    scri_plus=xmax;
     double totflux=0.0,totflux1=0.0,totflux2=0.0,totflux3=0.0,totflux4=0.0,totflux5=0.0;
     double xachk,rsch,rschm2m,r0m2m;
     //energy is flux at infinity, hflux is flux at horizon
     double f0,r0,fp0,vr0;
     double totforce;
     //sets up mesh and returns r0, im, imm, and ismhf
-    mesh(xm,width,xmin,xmax,delx,sourx,&r0,&im,&imm,&ismhf,iwidth,rsch0,rstar0);
+    mesh(xm,width,xmin,xmax,delx,&r0,&im,&imm,&ismhf,iwidth,rsch0,rstar0);
     printf("%f\n",r0);
     double freq=sqrt(xm/pow(r0,3));
     double complex totalforcearray[70000];
@@ -485,13 +488,13 @@ double rst2rsch (double rstar,double rsch,double rschm2m,double xm){
 }
 
 //this mesh creates corresponding r values to every x value in the mesh.
-void mesh (double xm,double width,double xmin, double xmax,double delx,double sourx,double *r0,int *im, int *imm, int *ismhf,int iwidth,double rsch0,double rstar0){
+void mesh (double xm,double width, double delx,double *r0,int *im, int *imm, int *ismhf,int iwidth,double rsch0,double rstar0){
     //printf("%d\n",iwidth);
     int dim =1;
     double rschmax=xmax,rschm2m,rschmaxm2m;
     //arrays to be used for integration
-    double r[ip],rstar[ip],rm2m[ip];
-    double delrstar=0.5*delx;
+    double r[ip],rstar[ip],rm2m[ip],Rstar[ip];
+    double delRstar=0.5*delx;
     
     //sets up the integration tool utilized by GSL.
     gsl_odeiv2_system sys = {odefunc, NULL, dim, NULL};
@@ -508,7 +511,8 @@ void mesh (double xm,double width,double xmin, double xmax,double delx,double so
     double y[1]= {rschmaxm2m};  /* initial value */
     //initializes arrays, with twice as many entries as the final a or b arrays
     //this is because so the integration happens once, with steps delrstar instead of delx
-    rstar[0]  = xmax;
+    Rstar[0]=xmax;
+    rstar[0]  = xmax/omega(xmax);
     r[0]      = rschmax;
     rm2m[0]   = rschmaxm2m;
     *im= 2*iwidth+1;
@@ -516,7 +520,9 @@ void mesh (double xm,double width,double xmin, double xmax,double delx,double so
     //integration, evolves y from xi to x_i+1
     for (i = 1; i <= imax; i++)
     {
-        double xi = x0 - i *delrstar;
+        double rhoi = x0 - i *delRstar;
+        double xi=rhoi/omega(rhoi);
+
         //weird gsl syntax
         int status = gsl_odeiv2_driver_apply (d, &x, xi, y);
         
@@ -527,6 +533,7 @@ void mesh (double xm,double width,double xmin, double xmax,double delx,double so
         }
         /*printf ("%.8e %.8e\n", x, y[0]);*/
         //stores values in arrays
+        printf("%f\n",x-xi);
         rstar[i]=x;
         rm2m[i] =y[0];
         r[i]    =rm2m[i]+2*xm;
