@@ -13,6 +13,7 @@ const long int ip=150000;
 double ra[ip],rb[ip],ram2m[ip],rbm2m[ip];
 double xa[ip], xb[ip];
 double erra[ip],errb[ip];
+double rho_minus,rho_plus, horizon, scri_plus;
 
 //function prototypes
 double p(int l, int m,double x);
@@ -24,6 +25,16 @@ void mesh (double xm,double width,double xmin, double xmax,double delx,double so
 void initdata (int im,int imm,double delx,double complex *z,double complex *phi,double complex *pi,double *xa);
 double vpotential (double rsch,double rschm2m,double xm,int lval);
 void laxwen(int im,int imm, double delx,double rcour, double dt, double complex *z, double complex *phi, double complex *pi,double *v,double complex zag,double complex zagp1,double complex phiag,double complex phiagp1,double complex piag,double complex piagp1,int isphf,int ismhf, double complex *za, double complex *zb, double complex *pia, double complex *pib, double complex *phib);
+double omega(double rho);
+double omega_prime(double rho);
+double omega_double_prime(double rho);
+double H_bar(double rho);
+double H_bar_prime_rho(double rho);
+double H_bar_prime_x(double rho);
+double H(double rho);
+double H_prime_rho(double rho);
+double H_bar_prime_x(double rho);
+
 
 int main (void){
     int lmode;
@@ -31,7 +42,7 @@ int main (void){
     //would like to keep these variables defined locally in case any change is needed
 
     double delx=0.03,rcour,sourx=10.0,xm=1.0,dt,rsch0=10.0;
-    double width=1000.0;
+    double width=500.0;
     int iwidth=floor(width/delx);
     //declares integer values
     int itest,itest1,itest2,itest3,itest4,itest5;
@@ -47,7 +58,7 @@ int main (void){
     double totforce;
     //sets up mesh and returns r0, im, imm, and ismhf
     mesh(xm,width,xmin,xmax,delx,sourx,&r0,&im,&imm,&ismhf,iwidth,rsch0,rstar0);
-    
+    printf("%f\n",r0);
     double freq=sqrt(xm/pow(r0,3));
     double complex totalforcearray[70000];
     double t0 = (2.0*M_PI)/freq;
@@ -84,6 +95,7 @@ int main (void){
     double q=1.0;
     //Keplerian frequency of source
 //    #pragma omp parallel for schedule(dynamic) 
+    return 0;
     for (lmode=1;lmode<=1;lmode++){
         int mmode;
         for (mmode=1;mmode<=lmode;mmode++){
@@ -307,8 +319,96 @@ int main (void){
 
 //end of routine
 
+
+//compress function
+double omega(double rho){
+    if (rho<rho_minus){
+        return 1.0-pow((rho_minus-rho)/(rho_minus-horizon),4);
+    }
+    else if (rho>rho_plus){
+        return 1.0-pow((rho-rho_plus)/(scri_plus-rho_plus),4);
+    }
+    else{
+        return 1.0;   
+    }
+}
+
+//derivative of compress function
+double omega_prime(double rho){
+    if (rho<rho_minus){
+        return 4.0*(1.0/(rho_minus-horizon))*pow((rho_minus-rho)/(rho_minus-horizon),3);
+    }
+    else if (rho>rho_plus){
+        return 4.0*(-1.0/(scri_plus-rho_plus))*pow((rho-rho_plus)/(scri_plus-rho_plus),3);
+    }
+    else{
+        return 0.0;   
+    }
+}
+
+double omega_double_prime(double rho){
+    if (rho<rho_minus){
+        return 12.0*(-1.0/pow((rho_minus-horizon),2))*pow((rho_minus-rho)/(rho_minus-horizon),2);
+    }
+    else if (rho>rho_plus){
+        return 12.0*(-1.0/pow((scri_plus-rho_plus),2))*pow((rho-rho_plus)/(scri_plus-rho_plus),2);
+    }
+    else{
+        return 0.0;   
+    }
+}
+
+double H_bar(double rho){
+    return pow(omega(rho),2)/(omega(rho)-rho*omega_prime(rho));
+}
+
+double H_bar_prime_rho(double rho){
+    return ((2.0*omega(rho)*omega_prime(rho))/(omega(rho)-rho*omega_prime(rho)))+((rho*pow(omega(rho),2)*omega_double_prime(rho))/(pow((omega(rho)-rho*omega_prime(rho)),2)));
+}
+
+double H_bar_prime_x(double rho){
+    return H_bar_prime_rho(rho)*(1.0/H_bar(rho));
+}
+
+double H(double rho){
+    if (rho<rho_minus){
+        return H_bar(rho)-1.0;
+    }
+    else if (rho>rho_plus){
+        return 1.0-H_bar(rho);
+    }
+    else{
+        return 0.0;
+    }
+}
+
+double H_prime_rho(double rho){
+    if (rho<rho_minus){
+        return H_bar_prime_rho(rho);
+    }
+    else if (rho>rho_plus){
+        return -1.0*H_bar_prime_rho(rho);
+    }
+    else{
+        return 0.0;
+    }
+}
+
+double H_prime_x(rho){
+    if (rho<rho_minus){
+        return H_bar_prime_x(rho);
+    }
+    else if (rho>rho_plus){
+        return -1.0*H_bar_prime_x(rho);
+    }
+    else{
+        return 0.0;
+    }
+}
+
 //calculates assosciated legendre polynomials (all positive to get rid
 //of c-s phase factor
+
 double p(int l, int m,double x){
     if(m<0){
         puts("m is negative, cannot evaluate.");
@@ -385,8 +485,7 @@ double rst2rsch (double rstar,double rsch,double rschm2m,double xm){
 }
 
 //this mesh creates corresponding r values to every x value in the mesh.
-void mesh (double xm,double width,double xmin, double xmax,double delx,double sourx,double *r0,int *im, int *imm, int *ismhf,int iwidth,double rsch0,double rstar0)
-{
+void mesh (double xm,double width,double xmin, double xmax,double delx,double sourx,double *r0,int *im, int *imm, int *ismhf,int iwidth,double rsch0,double rstar0){
     //printf("%d\n",iwidth);
     int dim =1;
     double rschmax=xmax,rschm2m,rschmaxm2m;
