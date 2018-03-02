@@ -234,6 +234,7 @@ int main (void){
                 //use logistic function to reduce transient behavior
                 //gb   = -qlm*f0*cexp(-I*omega*t)/(1.0+exp(15.0-0.5*t));
                 gb   = -qlm*f0*cexp(-I*omega*t);
+                printf("gb=%e\n",gb);
                 //dgb  = -qlm*f0*(0.5*cexp(15.0-0.5*t-I*t*omega)/pow(1.0+exp(15-0.5*t),2.0))-(I*omega*cexp(I*omega*t)/(1.0+exp(15.0-0.5*t)));
                 dgb=I*omega*qlm*f0*cexp(-I*omega*t);
                 fb   = 0.0+0.0*I;
@@ -251,7 +252,7 @@ int main (void){
                 
                 //ghost zone variables
                 
-                zag=z[ismhf]+jpsi-0.5*jdpsi*delrho;
+                zag      =z[ismhf]+jpsi-0.5*jdpsi*delrho;
                 zagp1    =z[isphf]-jpsi-0.5*jdpsi*delrho;
                 phiag    =phi[ismhf]+jphi-0.5*jdphi*delrho;
                 phiagp1  =phi[isphf]-jphi-0.5*jdphi*delrho;
