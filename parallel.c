@@ -20,18 +20,10 @@ double xm=1.0;
 typedef struct function{
     double * boosta;
     double * boostderiva;
-    double * compressa;
-    double * compressderiva;
-    double * lfunca;
-    double * lfuncderiva;
     double * omega2dLa;
     double * omega2dLderiva;
     double * boostb;
     double * boostderivb;
-    double * compressb;
-    double * compressderivb;
-    double * lfuncb;
-    double * lfuncderivb;
     double * omega2dLb;
     double * omega2dLderivb;
 }Function;
@@ -135,18 +127,10 @@ int main (void){
     
     functions->boosta = malloc(sizeof(double)*(im+1));
     functions->boostderiva = malloc(sizeof(double)*(im+1));
-    functions->compressa = malloc(sizeof(double)*(im+1));
-    functions->compressderiva = malloc(sizeof(double)*(im+1));
-    functions->lfunca = malloc(sizeof(double)*(im+1));
-    functions->lfuncderiva = malloc(sizeof(double)*(im+1));
     functions->omega2dLa = malloc(sizeof(double)*(im+1));
     functions->omega2dLderiva = malloc(sizeof(double)*(im+1));
     functions->boostb = malloc(sizeof(double)*(im));
     functions->boostderivb = malloc(sizeof(double)*(im));
-    functions->compressb = malloc(sizeof(double)*(im));
-    functions->compressderivb = malloc(sizeof(double)*(im));
-    functions->lfuncb = malloc(sizeof(double)*(im));
-    functions->lfuncderivb = malloc(sizeof(double)*(im));
     functions->omega2dLb = malloc(sizeof(double)*(im));
     functions->omega2dLderivb = malloc(sizeof(double)*(im));
     int i;
@@ -156,27 +140,19 @@ int main (void){
     for (i=0;i<=im;i++){
         functions->boosta[i]= H(rhoa[i]);
         functions->boostderiva[i]=H_prime_rho(rhoa[i]);
-        functions->compressa[i]=omega(rhoa[i]);
-        functions->compressderiva[i]=omega_prime(rhoa[i]);
-        functions->lfunca[i]=Lfunc(rhoa[i]);
-        functions->lfuncderiva[i]=Lfunc_prime(rhoa[i]);
         functions->omega2dLa[i] = pow(omega(rhoa[i]),2.0)/Lfunc(rhoa[i]);
         functions->omega2dLderiva[i] = H_bar_prime_rho(rhoa[i]);
-        fprintf(funcptr,"%d, %+.2e, %+.2e, %+.2e, %+.2e, %+.2e, %+.2e, %+.2e\n",
-        i, rhoa[i], functions->boosta[i], functions->boostderiva[i], functions->compressa[i],
-        functions->compressderiva[i], functions->lfunca[i], functions->lfuncderiva[i]);
+        //fprintf(funcptr,"%d, %+.2e, %+.2e, %+.2e, %+.2e, %+.2e, %+.2e, %+.2e\n",
+        //i, rhoa[i], functions->boosta[i], functions->boostderiva[i], functions->compressa[i],
+        //functions->compressderiva[i], functions->lfunca[i], functions->lfuncderiva[i]);
         if (i==im)
             break;
         functions->boostb[i]= H(rhob[i]);
-        functions->boostderivb[i]=H_prime_x(rhob[i]);
-        functions->compressb[i]=omega(rhob[i]);
-        functions->compressderivb[i]=omega_prime(rhob[i]);
-        functions->lfuncb[i]=Lfunc(rhob[i]);
-        functions->lfuncderivb[i]=Lfunc_prime(rhob[i]);
+        functions->boostderivb[i]=H_prime_rho(rhob[i]);
         functions->omega2dLb[i] = pow(omega(rhob[i]),2.0)/Lfunc(rhob[i]);
         functions->omega2dLderiva[i] = H_bar_prime_rho(rhob[i]);
     }
-    printf("%f\n", H_prime_rho(rhoa[0]));
+    printf("%d, %d\n", ismhf, isphf);
     fclose(funcptr);
     
     for (lmode=1;lmode<=1;lmode++){
@@ -248,7 +224,7 @@ int main (void){
             }
             for (n=1;n<=ntot;n++){
                 if(n%100==0){
-                    printf("%d\n",n);
+                    printf("%+e%+eI\n",creal(z[36405]),cimag(z[36405]));
                 }
                 //calculates time
                 t=n*dt;
@@ -350,12 +326,12 @@ int main (void){
                     char filename [20];
                     sprintf(filename, "dn%02d,%02d,%02dmode.csv", ifilenum,lmode,mmode);
                     FILE *dnptr= fopen(filename,"w");
-                    for (i=2;i<=imm-1;i++){
+                    for (i=0;i<=im;i++){
                         double pp=creal(z[i]);
                         double up=cimag(z[i]);
-                        if (fabs(pp)<1e-60||fabs(pp)>4.0)
+                        if (fabs(pp)<1e-60)
                             pp=0.0;
-                        if (fabs(up)<1e-60||fabs(pp)>4.0)
+                        if (fabs(up)<1e-60)
                             up=0.0;
                         fprintf(dnptr,"%7d,   %10e,   %10e,   %10e,   %10e,\n",i,xa[i],ra[i],pp,up);
                     }
@@ -398,18 +374,10 @@ int main (void){
     }
     free(functions->boosta);
     free(functions->boostderiva);
-    free(functions->compressa);
-    free(functions->compressderiva);
-    free(functions->lfunca);
-    free(functions->lfuncderiva);
     free(functions->omega2dLa);
     free(functions->omega2dLderiva);
     free(functions->boostb);
     free(functions->boostderivb);
-    free(functions->compressb);
-    free(functions->compressderivb);
-    free(functions->lfuncb);
-    free(functions->lfuncderivb);
     free(functions->omega2dLb);
     free(functions->omega2dLderivb);
     free(functions);
@@ -757,13 +725,13 @@ void laxwen(int im,int imm, double delrho,double rcour, double dt, double comple
     picp  = 0.5*(piag+pi[isphf])+(1.0/(1.0-pow(functions->boostb[ismhf],2.0)))*
     (0.5*rcour*pow(functions->omega2dLb[ismhf],2.0)*(phi[isphf]-phiag)+0.25*dt*(functions->omega2dLderivb[ismhf])*(phi[isphf]+phiag)
     -rcour*(functions->omega2dLb[ismhf])*(functions->boostb[ismhf])*(pi[isphf]-piag)
-    -0.25*dt*(functions->omega2dLb[ismhf])*(functions->compressderivb[ismhf])*(pi[isphf]+piag)-0.25*dt*vb[ismhf]*(z[isphf]+zag)
+    -0.25*dt*(functions->omega2dLb[ismhf])*(functions->boostderivb[ismhf])*(pi[isphf]+piag)-0.25*dt*vb[ismhf]*(z[isphf]+zag)
     );
     phicp = 0.5*(phiag + phi[isphf]+0.5*rcour*(pi[isphf] - piag));
     picm  = 0.5*(pi[ismhf]+piagp1)+(1.0/(1.0-pow(functions->boostb[ismhf],2.0)))*
     (0.5*rcour*pow(functions->omega2dLb[ismhf],2.0)*(phiagp1-phi[ismhf])+0.25*dt*(functions->omega2dLderivb[ismhf])*(phiagp1+phi[ismhf])
     -rcour*(functions->omega2dLb[ismhf])*(functions->boostb[ismhf])*(piagp1-pi[ismhf])
-    -0.25*dt*(functions->omega2dLb[ismhf])*(functions->compressderivb[ismhf])*(piagp1+pi[ismhf])-0.25*dt*vb[ismhf]*(zagp1+z[ismhf])
+    -0.25*dt*(functions->omega2dLb[ismhf])*(functions->boostderivb[ismhf])*(piagp1+pi[ismhf])-0.25*dt*vb[ismhf]*(zagp1+z[ismhf])
     );
     phicm = 0.5*(phi[ismhf] + phiagp1)+0.5*rcour*(piagp1 - pi[ismhf]);
     
@@ -778,7 +746,7 @@ void laxwen(int im,int imm, double delrho,double rcour, double dt, double comple
         pib[i]  = 0.5*(pi[i]+pi[i+1])+(1.0/(1.0-pow(functions->boostb[i],2.0)))*
         (0.5*rcour*pow(functions->omega2dLb[i],2.0)*(phi[i+1]-phi[i])+0.25*dt*(functions->omega2dLderivb[i])*(phi[i+1]+phi[i])
         -rcour*(functions->omega2dLb[i])*(functions->boostb[i])*(pi[i+1]-pi[i])
-        -0.25*dt*(functions->omega2dLa[i])*(functions->compressderivb[i])*(pi[i+1]+pi[i])-0.25*dt*vb[i]*(z[i+1]+z[i])
+        -0.25*dt*(functions->omega2dLa[i])*(functions->boostderivb[i])*(pi[i+1]+pi[i])-0.25*dt*vb[i]*(z[i+1]+z[i])
         );
         phib[i] = 0.5*(phi[i] + phi[i+1])+0.5*rcour*(pi[i+1] - pi[i]);
     }
@@ -793,7 +761,7 @@ void laxwen(int im,int imm, double delrho,double rcour, double dt, double comple
             pi[i]  += (1.0/(1.0-pow(functions->boosta[i],2.0)))
             *(rcour*pow(functions->omega2dLa[i],2.0)*(phib[i]-phicp)+0.5*dt*(functions->omega2dLderiva[i])*(phib[i]+phicp)
             -2.0*rcour*(functions->omega2dLa[i])*(functions->boosta[i])*(pib[i]-picp)
-            -0.5*dt*(functions->omega2dLa[i])*(functions->compressderiva[i])*(pib[i]+picp)-0.5*dt*va[i]*(za[i])
+            -0.5*dt*(functions->omega2dLa[i])*(functions->boostderiva[i])*(pib[i]+picp)-0.5*dt*va[i]*(za[i])
             );
             phi[i]=phi[i]+rcour*(pib[i]-picp);
         }
@@ -802,7 +770,7 @@ void laxwen(int im,int imm, double delrho,double rcour, double dt, double comple
             pi[i]  += (1.0/(1.0-pow(functions->boosta[i],2.0)))*
             (rcour*pow(functions->omega2dLa[i],2.0)*(phicm-phib[i-1])+0.5*dt*(functions->omega2dLderiva[i])*(phicm+phib[i-1])
             -2.0*rcour*(functions->omega2dLa[i])*(functions->boosta[i])*(picm-pib[i-1])
-            -0.5*dt*(functions->omega2dLa[i])*(functions->compressderiva[i])*(picm+pib[i-1])-0.5*dt*va[i]*(za[i])
+            -0.5*dt*(functions->omega2dLa[i])*(functions->boostderiva[i])*(picm+pib[i-1])-0.5*dt*va[i]*(za[i])
             );
             phi[i]=phi[i]+rcour*(picm-pib[i-1]);
         }
@@ -811,7 +779,7 @@ void laxwen(int im,int imm, double delrho,double rcour, double dt, double comple
             pi[i]  += (1.0/(1.0-pow(functions->boosta[i],2.0)))*
             (rcour*pow(functions->omega2dLa[i],2.0)*(phib[i]-phib[i-1])+0.5*dt*(functions->omega2dLderiva[i])*(phib[i]+phib[i-1])
             -2.0*rcour*(functions->omega2dLa[i])*(functions->boosta[i])*(pib[i]-pib[i-1])
-            -0.5*dt*(functions->omega2dLa[i])*(functions->compressderiva[i])*(pib[i]+pib[i-1])-0.5*dt*va[i]*(za[i])
+            -0.5*dt*(functions->omega2dLa[i])*(functions->boostderiva[i])*(pib[i]+pib[i-1])-0.5*dt*va[i]*(za[i])
             );
             phi[i]=phi[i]+rcour*(pib[i]-pib[i-1]);
         }
