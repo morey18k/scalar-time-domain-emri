@@ -161,6 +161,7 @@ int main (void){
                 fb   = 0.0+0.0*I;
                 dfb  = 0.0+0.0*I;
                 ddfb = 0.0+0.0*I;
+                printf("gb=%e\n",gb);
                 
                 //jump conditions
                 
