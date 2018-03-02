@@ -222,7 +222,7 @@ int main (void){
                     break;
                 vb[i]=vpotential(rb[i],rbm2m[i], xm, lmode);
             }
-            for (n=1;n<=ntot;n++){
+            for (n=1;n<=1;n++){
                 if(n%100==0){
                     printf("%+e%+eI\n",creal(z[36405]),cimag(z[36405]));
                 }
@@ -232,8 +232,10 @@ int main (void){
                 
                 //complex functions of time that multiply delta function
                 //use logistic function to reduce transient behavior
-                gb   = -qlm*f0*cexp(-I*omega*t)/(1.0+exp(15.0-0.5*t));
-                dgb  = -qlm*f0*(0.5*cexp(15.0-0.5*t-I*t*omega)/pow(1.0+exp(15-0.5*t),2.0))-(I*omega*cexp(I*omega*t)/(1.0+exp(15.0-0.5*t)));
+                //gb   = -qlm*f0*cexp(-I*omega*t)/(1.0+exp(15.0-0.5*t));
+                gb   = -qlm*f0*cexp(-I*omega*t);
+                //dgb  = -qlm*f0*(0.5*cexp(15.0-0.5*t-I*t*omega)/pow(1.0+exp(15-0.5*t),2.0))-(I*omega*cexp(I*omega*t)/(1.0+exp(15.0-0.5*t)));
+                dgb=I*omega*qlm*f0*cexp(-I*omega*t);
                 fb   = 0.0+0.0*I;
                 dfb  = 0.0+0.0*I;
                 ddfb = 0.0+0.0*I;
@@ -735,7 +737,7 @@ void laxwen(int im,int imm, double delrho,double rcour, double dt, double comple
     );
     phicm = 0.5*(phi[ismhf] + phiagp1)+0.5*rcour*(piagp1 - pi[ismhf]);
     
-    
+    printf("%e, %e, %e, %e,\n", picp, phicp, picm, phicm); 
     //NOTE: I have corrected the incorrect array handling
     //I start loops at one and end them at imm (one less than xmax)
     //impose boundary conditions at i=0 and i=im (xmin and xmax)
