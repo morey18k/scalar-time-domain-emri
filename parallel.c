@@ -736,7 +736,7 @@ void laxwen(int im,int imm, double delrho,double rcour, double dt, double comple
     -0.25*dt*(functions->omega2dLb[ismhf])*(functions->boostderivb[ismhf])*(piagp1+pi[ismhf])-0.25*dt*vb[ismhf]*(zagp1+z[ismhf])
     );
     phicm = 0.5*(phi[ismhf] + phiagp1)+0.5*rcour*(piagp1 - pi[ismhf]);
-    
+    printf("phiag=%e, piag=%e\n",phiag, piag);    
     printf("%e, %e, %e, %e,\n", picp, phicp, picm, phicm); 
     //NOTE: I have corrected the incorrect array handling
     //I start loops at one and end them at imm (one less than xmax)
