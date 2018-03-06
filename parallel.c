@@ -23,7 +23,7 @@ double rst2rsch (double rstar,double rsch,double rschm2m,double xm);
 void mesh (double xm,double width,double xmin, double xmax,double delx,double sourx,double *r0,int *im, int *imm, int *ismhf,int iwidth,double rsch0,double rstar0);
 void initdata (int im,int imm,double delx,double complex *z,double complex *phi,double complex *pi,double *xa);
 double vpotential (double rsch,double rschm2m,double xm,int lval);
-void laxwen(int im,int imm, double delx,double rcour, double dt, double complex *z, double complex *phi, double complex *pi,double *v,double complex zag,double complex zagp1,double complex phiag,double complex phiagp1,double complex piag,double complex piagp1,int isphf,int ismhf, double complex *za, double complex *zb, double complex *pia, double complex *pib, double complex *phib);
+void laxwen(int im,int imm, double delx,double rcour, double dt, double complex *z, double complex *phi, double complex *pi,double *va, double * vb,double complex zag,double complex zagp1,double complex phiag,double complex phiagp1,double complex piag,double complex piagp1,int isphf,int ismhf, double complex *za, double complex *zb, double complex *pia, double complex *pib, double complex *phib);
 
 int main (void){
     int lmode;
@@ -38,8 +38,8 @@ int main (void){
     int im,imm,ismhf,isphf,nperiod;
     //other valuable constants
     double rstar0=rsch0+2*xm*log((rsch0-2*xm)/(2*xm));
-    double xmin=rstar0-iwidth*delx;
-    double xmax=rstar0+iwidth*delx;
+    double xmin=rstar0-iwidth*delx-0.5*delx;
+    double xmax=rstar0+iwidth*delx+0.5*delx;
     double totflux=0.0,totflux1=0.0,totflux2=0.0,totflux3=0.0,totflux4=0.0,totflux5=0.0;
     double xachk,rsch,rschm2m,r0m2m;
     //energy is flux at infinity, hflux is flux at horizon
@@ -101,7 +101,7 @@ int main (void){
             time(&start_t);
             //printf("l=%d,m=%d,thread=%d\n", lmode,mmode,omp_get_thread_num());
             //frequency by m mode
-            double pitempleft,pitempright, v[ip];
+            double pitempleft,pitempright;
             double complex * z=malloc(sizeof(double complex)*ip);
             double complex * pi=malloc(sizeof(double complex)*ip);
             double complex * phi=malloc(sizeof(double complex)*ip);
@@ -134,17 +134,21 @@ int main (void){
             //printf("qlm for l=%02d, m=%02d is %.5f+%.5fI\n",lmode, mmode, creal(qlm),cimag(qlm));        
             //prints frequency of source to the screen
             //calculates a potential array from the array of r values
-            FILE *vptr=fopen("potential.txt","w");
-            for (i=1;i<=imm;i++){
-                v[i]=vpotential(ra[i],ram2m[i],xm,lmode);
-                if (i%3==0 &&xa[i]>-20&&xa[i]<30)
-                    fprintf(vptr,"%d,  %f,  %f,  %f,\n",i,ra[i],xa[i],v[i]);
+            FILE *vptr=fopen("potential.csv","w");
+            double * va = malloc(sizeof(double)*im);
+            double * vb= malloc(sizeof(double)*imm);
+            for (i=0;i<=im;i++){
+                va[i]=vpotential(ra[i],ram2m[i],xm,lmode);
+                if (i==im)
+                    break;
+                vb[i]=vpotential(rb[i],rbm2m[i],xm,lmode);
+                fprintf(vptr,"%d,  %f,  %f,  %f,\n",i,xa[i],xb[i],va[i]);
             }
             fclose(vptr);
             //sets up the initial values of all the arrays
             initdata (im,imm,delx,z,phi,pi,xa);
             //time loop
-            for (n=1;n<=1;n++){
+            for (n=1;n<=ntot;n++){
                 if(n%100==0){
                     printf("%d\n",n);
                 }
@@ -154,14 +158,13 @@ int main (void){
                 
                 //complex functions of time that multiply delta function
                 //use logistic function to reduce transient behavior
-                //gb   = -qlm*f0*cexp(-I*omega*t)/(1.0+exp(15.0-0.5*t));
-                gb   = -qlm*f0*cexp(-I*omega*t);
-                //dgb  = -qlm*f0*(0.5*cexp(15.0-0.5*t-I*t*omega)/pow(1.0+exp(15-0.5*t),2.0))-(I*omega*cexp(I*omega*t)/(1.0+exp(15.0-0.5*t)));
-                dgb=I*omega*qlm*f0*cexp(-I*omega*t);
+                gb   = -qlm*f0*cexp(-I*omega*t)/(1.0+exp(15.0-0.5*t));
+                //gb   = -qlm*f0*cexp(-I*omega*t);
+                dgb  = -qlm*f0*(0.5*cexp(15.0-0.5*t-I*t*omega)/pow(1.0+exp(15-0.5*t),2.0))-(I*omega*cexp(I*omega*t)/(1.0+exp(15.0-0.5*t)));
+                //dgb=I*omega*qlm*f0*cexp(-I*omega*t);
                 fb   = 0.0+0.0*I;
                 dfb  = 0.0+0.0*I;
                 ddfb = 0.0+0.0*I;
-                printf("gb=%e\n",gb);
                 
                 //jump conditions
                 
@@ -182,7 +185,7 @@ int main (void){
                 piagp1   =pi[isphf]-jpi-0.5*jdpi*delx;
                 
                 //uses ghost zone variables to move wave forward one step
-                laxwen (im,imm,delx,rcour,dt,z,phi,pi,v,zag,zagp1,phiag,phiagp1,piag,piagp1,isphf,ismhf,za,zb,pia,pib,phib);
+                laxwen (im,imm,delx,rcour,dt,z,phi,pi,va,vb,zag,zagp1,phiag,phiagp1,piag,piagp1,isphf,ismhf,za,zb,pia,pib,phib);
                 
                 //calculates the energy flux at the test point
                 energyv = -(pi[itest]*conj(phi[itest]))/(4.0*M_PI);
@@ -281,6 +284,8 @@ int main (void){
             diff_t = difftime(end_t, start_t);
             //printf ("Zone cycles per second = %e\n",((double) im*ntot)/diff_t);
             fclose(forceptr);
+            free(va);
+            free(vb);
             free(energy);
             free(forcetarray);
             free(z);
@@ -416,9 +421,9 @@ void mesh (double xm,double width,double xmin, double xmax,double delx,double so
     r[0]      = rschmax;
     rm2m[0]   = rschmaxm2m;
     *im= 2*iwidth+1;
-    imax      = *im*2;
+    imax      = *im*2+1;
     //integration, evolves y from xi to x_i+1
-    for (i = 1; i <= imax; i++)
+    for (i = 1; i <= imax-1; i++)
     {
         double xi = x0 - i *delrstar;
         //weird gsl syntax
@@ -437,7 +442,7 @@ void mesh (double xm,double width,double xmin, double xmax,double delx,double so
     }
     //finds the nearest zone face to put the source on approximately near the sourx
     //this is in the index according to arrays r and rstar
-    i2       =  2*iwidth;
+    i2       =  2*iwidth+1;
     //calculates the index of the zone center to the left of the source in terms of a array
     i2n      = iwidth;
     //calculates the source radius
@@ -450,17 +455,18 @@ void mesh (double xm,double width,double xmin, double xmax,double delx,double so
     
     //max i values in the a and b array index
     *imm = *im-1;
-    
     //a arrays (ram2m, ra, xa) correspond to zone centers of the mesh
     //b arrays (rbm2m,rb,xb) correspond to zone faces of the mesh
-    for (i = 0; i <= *imm; i++)
+    for (i = 0; i <= *im; i++)
     {
         xa[i]    = rstar[imax-2*(i)-1];
         ra[i]    = r[imax-2*(i)-1];
         ram2m[i] = rm2m[imax-2*(i)-1];
-        xb[i]    = rstar[imax-2*(i)];
-        rb[i]    = r[imax-2*(i)];
-        rbm2m[i] = rm2m[imax-2*(i)];
+        if (i==*im)
+            break;
+        xb[i]    = rstar[imax-2*(i)-2];
+        rb[i]    = r[imax-2*(i)-2];
+        rbm2m[i] = rm2m[imax-2*(i)-2];
     }
     //sum is used for averaging mesh error
     //checks formulas according to backwards solutions
@@ -515,7 +521,7 @@ double vpotential (double rsch,double rschm2m,double xm,int lval){
 
 
 //lax wendroff method, moves wave forward one step and uses ghost zone values
-void laxwen(int im,int imm, double delx,double rcour, double dt, double complex *z, double complex *phi, double complex *pi,double *v,double complex zag,double complex zagp1,double complex phiag,double complex phiagp1,double complex piag,double complex piagp1,int isphf,int ismhf, double complex *za, double complex *zb, double complex *pia, double complex *pib, double complex *phib){
+void laxwen(int im,int imm, double delx,double rcour, double dt, double complex *z, double complex *phi, double complex *pi,double *va, double * vb,double complex zag,double complex zagp1,double complex phiag,double complex phiagp1,double complex piag,double complex piagp1,int isphf,int ismhf, double complex *za, double complex *zb, double complex *pia, double complex *pib, double complex *phib){
     int i;
     
     double complex zcp,picp,phicp,zcm,picm,phicm;
@@ -524,14 +530,12 @@ void laxwen(int im,int imm, double delx,double rcour, double dt, double complex 
     //this is necessary as the fluxes near source use
     //ghost zone values as opposed to actual ones
     zcp   = 0.5*(zag + z[isphf])+0.25*dt*(piag + pi[isphf]);
-    picp  = 0.5*(piag+pi[isphf])+0.5*rcour*(phi[isphf] - phiag)-0.25*dt*(v[isphf-1]*zag + v[isphf]*z[isphf]);
-    phicp = 0.5*(phiag + phi[isphf]+0.5*rcour*(pi[isphf] - piag));
+    picp  = 0.5*(piag+pi[isphf])+0.5*rcour*(phi[isphf] - phiag)-0.25*dt*vb[ismhf]*(zag+z[isphf]);
+    phicp = 0.5*(phiag + phi[isphf])+0.5*rcour*(pi[isphf] - piag);
     zcm   = 0.5*(z[ismhf] + zagp1)+0.25*dt*(pi[ismhf] + piagp1);
-    picm  = 0.5*(pi[ismhf]+piagp1)+0.5*rcour*(phiagp1 - phi[ismhf])-0.25*dt*(v[ismhf]*z[ismhf] + v[ismhf+1]*zagp1);
+    picm  = 0.5*(pi[ismhf]+piagp1)+0.5*rcour*(phiagp1 - phi[ismhf])-0.25*dt*vb[ismhf]*(z[ismhf] + zagp1);
     phicm = 0.5*(phi[ismhf] + phiagp1)+0.5*rcour*(piagp1 - pi[ismhf]);
     
-    printf("phiag=%e, piag=%e\n", phiag, piag);
-    printf("%e  %e  %e  %e\n", picp, phicp, picm, phicm); 
     //NOTE: I have corrected the incorrect array handling
     //I start loops at one and end them at imm (one less than xmax)
     //impose boundary conditions at i=0 and i=im (xmin and xmax)
@@ -540,7 +544,7 @@ void laxwen(int im,int imm, double delx,double rcour, double dt, double complex 
     //fluxes
     for (i=1;i<=imm;i++){
         zb[i]   = 0.5*(z[i] + z[i+1])+0.25*dt*(pi[i] + pi[i+1]);
-        pib[i]  = 0.5*(pi[i]+pi[i+1])+0.5*rcour*(phi[i+1] - phi[i])-0.25*dt*(v[i]*z[i] + v[i+1]*z[i+1]);
+        pib[i]  = 0.5*(pi[i]+pi[i+1])+0.5*rcour*(phi[i+1] - phi[i])-0.25*dt*vb[i]*(z[i] + z[i+1]);
         phib[i] = 0.5*(phi[i] + phi[i+1])+0.5*rcour*(pi[i+1] - pi[i]);
     }
     
@@ -564,13 +568,13 @@ void laxwen(int im,int imm, double delx,double rcour, double dt, double complex 
     for (i=1;i<=imm;i++){
         z[i]+=dt*pia[i];
         if (i==isphf){
-            pi[i]+=rcour*(phib[i]-phicp)-dt*v[i]*za[i];
+            pi[i]+=rcour*(phib[i]-phicp)-dt*va[i]*za[i];
         }
         else if (i==ismhf){
-            pi[i]+=rcour*(phicm-phib[i-1])-dt*v[i]*za[i];
+            pi[i]+=rcour*(phicm-phib[i-1])-dt*va[i]*za[i];
         }
         else {
-            pi[i]+=rcour*(phib[i]-phib[i-1])-dt*v[i]*za[i];
+            pi[i]+=rcour*(phib[i]-phib[i-1])-dt*va[i]*za[i];
         }
     }
     //boundary conditions
