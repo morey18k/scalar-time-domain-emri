@@ -57,7 +57,7 @@ int main (void){
     //xm is black hole mass
     double delrho=0.03;
     double rcour,dt,rsch0=10.0;
-    double width=1001.0;
+    double width=1000.0;
     int iwidth=floor(width/delrho);
     //declares integer values
     int itest,itest1,itest2,itest3,itest4,itest5;
@@ -70,7 +70,7 @@ int main (void){
     //declares integer values
     rho_minus=rstar0-iwidth2*delrho;
     rho_plus=rstar0+iwidth2*delrho;
-
+    printf("rho_minus=%f, rho_plus=%f\n",rho_minus, rho_plus);
     double totflux=0.0,totflux1=0.0,totflux2=0.0,totflux3=0.0,totflux4=0.0,totflux5=0.0;
     double xachk,rsch,rschm2m,r0m2m;
     //energy is flux at infinity, hflux is flux at horizon
@@ -101,7 +101,7 @@ int main (void){
     //calculates zone face on other side of source
     isphf=ismhf+1;
     //sets up test value for measuring energy flux and value of wave
-    itest=floor((15.0+width-rstar0)/delrho)+1;
+    itest=imm-1;
     itest1=floor((25.0+width-rstar0)/delrho)+1;
     itest2=floor((50.0+width-rstar0)/delrho)+1;
     itest3=floor((200.0+width-rstar0)/delrho)+1;
@@ -113,8 +113,8 @@ int main (void){
     fp0  =(2*xm)/pow(r0,2);
     r0m2m=r0-2*xm;
     vr0  = vpotential(r0,r0m2m,xm,lmode);
-    
-    int n, ntot=30000; 
+    printf("pot at source=%+.10e\n",vr0); 
+    int n, ntot=60000; 
     for (n=0;n<ntot;n++){
         totalforcearray[n]=0.0;
     }
@@ -164,7 +164,6 @@ int main (void){
             FILE *forceptr=fopen("force.csv","w");
             FILE *fluxptr=fopen(fluxfilename,"w");
             
-            FILE *rxptr= fopen("bhpert.csv","w");
             FILE *ryptr= fopen("energy.txt","w");
             time_t start_t, end_t;
             double diff_t;
@@ -211,21 +210,19 @@ int main (void){
             double * va = malloc(sizeof(double)*(im+1));
             double * vb = malloc(sizeof(double)*(im));
             for (i=0;i<=im;i++){
-                if (i==0||i==0){
+                if (i==0||i==im){
                     va[i]=0;
                 }
                 else{
                     va[i]=vpotential(ra[i],ram2m[i],xm,lmode);
                 }
                 va[i]=vpotential(ra[i],ram2m[i],xm,lmode);
-                if (i=im)
+                if (i==im)
                     break;
                 vb[i]=vpotential(rb[i],rbm2m[i], xm, lmode);
             }
-            for (n=1;n<=1;n++){
-                if(n%100==0){
-                    printf("%+e%+eI\n",creal(z[36405]),cimag(z[36405]));
-                }
+            FILE *rxptr= fopen("bhpert.csv","w");
+            for (n=1;n<=ntot;n++){
                 //calculates time
                 t=n*dt;
                 
@@ -234,7 +231,7 @@ int main (void){
                 //use logistic function to reduce transient behavior
                 //gb   = -qlm*f0*cexp(-I*omega*t)/(1.0+exp(15.0-0.5*t));
                 gb   = -qlm*f0*cexp(-I*omega*t);
-                printf("gb=%e\n",gb);
+                //printf("r0=%e\n",r0);
                 //dgb  = -qlm*f0*(0.5*cexp(15.0-0.5*t-I*t*omega)/pow(1.0+exp(15-0.5*t),2.0))-(I*omega*cexp(I*omega*t)/(1.0+exp(15.0-0.5*t)));
                 dgb=I*omega*qlm*f0*cexp(-I*omega*t);
                 fb   = 0.0+0.0*I;
@@ -250,6 +247,7 @@ int main (void){
                 jdphi  = (1/pow(f0,2.0))*ddfb+vr0*jpsi;
                 jdpi   = fp0*jpi+(1.0/f0)*dgb;
                 
+                
                 //ghost zone variables
                 
                 zag      =z[ismhf]+jpsi-0.5*jdpsi*delrho;
@@ -261,9 +259,9 @@ int main (void){
                 
                 //uses ghost zone variables to move wave forward one step
                 laxwen (im,imm,delrho,rcour,dt,z,phi,pi,va,vb,zag,zagp1,phiag,phiagp1,piag,piagp1,isphf,ismhf,za,zb,pia,pib,phib,functions);
-                
+                fprintf(rxptr,"%d, %e, %e, %e\n",n, t, creal(z[im]), cimag(z[im]));    
                 //calculates the energy flux at the test point
-                energyv = -(pi[itest]*conj(phi[itest]))/(4.0*M_PI);
+                energyv = -(pi[itest]*conj(H_bar(rhoa[itest])*phi[itest]-H(rhoa[itest])*pi[itest]))/(4.0*M_PI);
                 //energyv1 = -(pi[itest1]*conj(phi[itest1]))/(4.0*M_PI);
                 //energyv2 = -(pi[itest2]*conj(phi[itest2]))/(4.0*M_PI);
                 //energyv3 = -(pi[itest3]*conj(phi[itest3]))/(4.0*M_PI);
@@ -341,6 +339,7 @@ int main (void){
                     fclose(dnptr);
                     icyclep=0;
                 }
+                //printf("eaflux=%e\n", eaflux);
             }
             fclose(rxptr);
             fclose(ryptr);
@@ -613,7 +612,7 @@ void mesh (double xm,double width, double delrho,double *r0,int *im, int *imm, i
     }
     //finds the nearest zone face to put the source on approximately near the sourx
     //this is in the index according to arrays r and rstar
-    i2       =  2*iwidth;
+    i2       =  2*iwidth+1;
     //calculates the index of the zone center to the left of the source in terms of a array
     i2n      = iwidth;
     //calculates the source radius
@@ -722,32 +721,41 @@ void laxwen(int im,int imm, double delrho,double rcour, double dt, double comple
     
     double complex zcp,picp,phicp,zcm,picm,phicm;
     
+    zcp   = 0.5*(zag + z[isphf])+0.25*dt*(piag + pi[isphf]);
+    zcm   = 0.5*(z[ismhf] + zagp1)+0.25*dt*(pi[ismhf] + piagp1);   
     //calculates fluxes near source
     //this is necessary as the fluxes near source use
     //ghost zone values as opposed to actual ones
     picp  = 0.5*(piag+pi[isphf])+(1.0/(1.0-pow(functions->boostb[ismhf],2.0)))*
-    (0.5*rcour*pow(functions->omega2dLb[ismhf],2.0)*(phi[isphf]-phiag)+0.25*dt*(functions->omega2dLderivb[ismhf])*(phi[isphf]+phiag)
+    (0.5*rcour*pow(functions->omega2dLb[ismhf],2.0)*(phi[isphf]-phiag)
+    +0.25*dt*(functions->omega2dLderivb[ismhf])*(functions->omega2dLb[ismhf])*(phi[isphf]+phiag)
     -rcour*(functions->omega2dLb[ismhf])*(functions->boostb[ismhf])*(pi[isphf]-piag)
     -0.25*dt*(functions->omega2dLb[ismhf])*(functions->boostderivb[ismhf])*(pi[isphf]+piag)-0.25*dt*vb[ismhf]*(z[isphf]+zag)
     );
-    phicp = 0.5*(phiag + phi[isphf]+0.5*rcour*(pi[isphf] - piag));
+ //   printf("potential= %+.10e, zag=%+.10e %+.10e\n",vb[ismhf],creal(zag),cimag(zag)); 
+    phicp = 0.5*(phiag + phi[isphf])+0.5*rcour*(pi[isphf] - piag);
     picm  = 0.5*(pi[ismhf]+piagp1)+(1.0/(1.0-pow(functions->boostb[ismhf],2.0)))*
-    (0.5*rcour*pow(functions->omega2dLb[ismhf],2.0)*(phiagp1-phi[ismhf])+0.25*dt*(functions->omega2dLderivb[ismhf])*(phiagp1+phi[ismhf])
+    (0.5*rcour*pow(functions->omega2dLb[ismhf],2.0)*(phiagp1-phi[ismhf])
+    +0.25*dt*(functions->omega2dLderivb[ismhf])*(functions->omega2dLb[ismhf])*(phiagp1+phi[ismhf])
     -rcour*(functions->omega2dLb[ismhf])*(functions->boostb[ismhf])*(piagp1-pi[ismhf])
     -0.25*dt*(functions->omega2dLb[ismhf])*(functions->boostderivb[ismhf])*(piagp1+pi[ismhf])-0.25*dt*vb[ismhf]*(zagp1+z[ismhf])
     );
     phicm = 0.5*(phi[ismhf] + phiagp1)+0.5*rcour*(piagp1 - pi[ismhf]);
-    printf("phiag=%e, piag=%e\n",phiag, piag);    
-    printf("%e, %e, %e, %e,\n", picp, phicp, picm, phicm); 
+   // printf("phiag=%+.10e%+.10eI, piag=%+.10e%+.10eI\n",creal(phiag),cimag(phiag), creal(piag),cimag(piag));    
+    //printf("picp=%+.10e%+.10eI, phicp=,%+.10e%+.10eI, picm=%+.10e%+.10eI, phicm=%+.10e%+.10eI\n", creal(picp),cimag(picp),creal(phicp), cimag(phicp), creal(picm),cimag(phicm), creal(phicm),cimag(phicm)); 
+   // printf("boost at source=%.10e\n", functions->boostderivb[ismhf]);
     //NOTE: I have corrected the incorrect array handling
     //I start loops at one and end them at imm (one less than xmax)
     //impose boundary conditions at i=0 and i=im (xmin and xmax)
     
     
+
     //fluxes
-    for (i=1;i<=imm;i++){
+    for (i=0;i<=imm;i++){
+        zb[i]   = 0.5*(z[i] + z[i+1])+0.25*dt*(pi[i] + pi[i+1]);
         pib[i]  = 0.5*(pi[i]+pi[i+1])+(1.0/(1.0-pow(functions->boostb[i],2.0)))*
-        (0.5*rcour*pow(functions->omega2dLb[i],2.0)*(phi[i+1]-phi[i])+0.25*dt*(functions->omega2dLderivb[i])*(phi[i+1]+phi[i])
+        (0.5*rcour*pow(functions->omega2dLb[i],2.0)*(phi[i+1]-phi[i])
+        +0.25*dt*(functions->omega2dLderivb[i])*(functions->omega2dLb[i])*(phi[i+1]+phi[i])
         -rcour*(functions->omega2dLb[i])*(functions->boostb[i])*(pi[i+1]-pi[i])
         -0.25*dt*(functions->omega2dLa[i])*(functions->boostderivb[i])*(pi[i+1]+pi[i])-0.25*dt*vb[i]*(z[i+1]+z[i])
         );
@@ -758,44 +766,65 @@ void laxwen(int im,int imm, double delrho,double rcour, double dt, double comple
     //faces near the center
     //move pi and z forward using averaged results
     for (i=1;i<=imm;i++){
-        za[i]   = z[i]+0.5*dt*(pi[i]);
+        if(i==isphf){
+            za[i]=0.5*(zb[i]+zcp);
+        }
+        else if (i==ismhf){
+            za[i]=0.5*(zcm+zb[i-1]);
+        }
+        else{
+            za[i]=0.5*(zb[i]+zb[i-1]);
+        }
+    }
+    
+    double complex other=0.0+0.0*I;
+    for (i=1;i<=imm;i++){
         if (i==isphf){
             z[i]+=0.5*dt*(pib[i]+picp);
             pi[i]  += (1.0/(1.0-pow(functions->boosta[i],2.0)))
-            *(rcour*pow(functions->omega2dLa[i],2.0)*(phib[i]-phicp)+0.5*dt*(functions->omega2dLderiva[i])*(phib[i]+phicp)
+            *(rcour*pow(functions->omega2dLa[i],2.0)*(phib[i]-phicp)
+            +0.5*dt*(functions->omega2dLderiva[i])*(functions->omega2dLa[i])*(phib[i]+phicp)
             -2.0*rcour*(functions->omega2dLa[i])*(functions->boosta[i])*(pib[i]-picp)
-            -0.5*dt*(functions->omega2dLa[i])*(functions->boostderiva[i])*(pib[i]+picp)-0.5*dt*va[i]*(za[i])
+            -0.5*dt*(functions->omega2dLa[i])*(functions->boostderiva[i])*(pib[i]+picp)-dt*va[i]*(za[i])
             );
             phi[i]=phi[i]+rcour*(pib[i]-picp);
         }
         else if (i==ismhf){
             z[i]+=0.5*dt*(picm+pib[i]);
             pi[i]  += (1.0/(1.0-pow(functions->boosta[i],2.0)))*
-            (rcour*pow(functions->omega2dLa[i],2.0)*(phicm-phib[i-1])+0.5*dt*(functions->omega2dLderiva[i])*(phicm+phib[i-1])
+            (rcour*pow(functions->omega2dLa[i],2.0)*(phicm-phib[i-1])
+            +0.5*dt*(functions->omega2dLderiva[i])*(functions->omega2dLa[i])*(phicm+phib[i-1])
             -2.0*rcour*(functions->omega2dLa[i])*(functions->boosta[i])*(picm-pib[i-1])
-            -0.5*dt*(functions->omega2dLa[i])*(functions->boostderiva[i])*(picm+pib[i-1])-0.5*dt*va[i]*(za[i])
+            -0.5*dt*(functions->omega2dLa[i])*(functions->boostderiva[i])*(picm+pib[i-1])-dt*va[i]*(za[i])
             );
+            other+=rcour*(phicm-phib[i-1])-dt*va[i]*za[i];
             phi[i]=phi[i]+rcour*(picm-pib[i-1]);
         }
         else {
             z[i]+=0.5*dt*(pib[i]+pib[i-1]);
             pi[i]  += (1.0/(1.0-pow(functions->boosta[i],2.0)))*
-            (rcour*pow(functions->omega2dLa[i],2.0)*(phib[i]-phib[i-1])+0.5*dt*(functions->omega2dLderiva[i])*(phib[i]+phib[i-1])
+            (rcour*pow(functions->omega2dLa[i],2.0)*(phib[i]-phib[i-1])
+            +0.5*dt*(functions->omega2dLderiva[i])*(functions->omega2dLa[i])*(phib[i]+phib[i-1])
             -2.0*rcour*(functions->omega2dLa[i])*(functions->boosta[i])*(pib[i]-pib[i-1])
-            -0.5*dt*(functions->omega2dLa[i])*(functions->boostderiva[i])*(pib[i]+pib[i-1])-0.5*dt*va[i]*(za[i])
+            -0.5*dt*(functions->omega2dLa[i])*(functions->boostderiva[i])*(pib[i]+pib[i-1])-dt*va[i]*(za[i])
             );
             phi[i]=phi[i]+rcour*(pib[i]-pib[i-1]);
         }
     }
+    //printf("%+.14e% +.14eI\n",creal(pi[ismhf]), cimag(pi[ismhf]));
+
+//    printf("%+.15f %+.15fI\n", creal(z[ismhf]),cimag(z[ismhf]));
     //boundary conditions
+    
     z[0]      = z[1]-(z[2]-z[1]);
     pi[0]     = pi[1]-(pi[2]-pi[1]);
-    z[im]     = pi[im-1]+(pi[im-1]-pi[im-2]);
+    z[im]     = z[im-1]+(z[im-1]-z[im-2]);
     pi[im]    = pi[im-1]+(pi[im-1]-pi[im-2]);
     
     //more boundary conditions
     phi[0]      = phi[1]-(phi[2]-phi[1]);
     phi[im]    = phi[im-1]+(phi[im-1]-phi[im-2]);
+    
     
 
 }
