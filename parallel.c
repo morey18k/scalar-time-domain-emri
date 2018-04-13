@@ -56,7 +56,7 @@ int main (void){
     //would like to keep these variables defined locally in case any change is needed
     //xm is black hole mass
     double delrho=0.03;
-    double rcour,dt,rsch0=10.0;
+    double rcour,dt,rsch0=6.0;
     double width=1000.0;
     int iwidth=floor(width/delrho);
     //declares integer values
@@ -72,6 +72,7 @@ int main (void){
     rho_plus=rstar0+iwidth2*delrho;
     printf("rho_minus=%f, rho_plus=%f\n",rho_minus, rho_plus);
     double totflux=0.0,totflux1=0.0,totflux2=0.0,totflux3=0.0,totflux4=0.0,totflux5=0.0;
+    double horflux=0.0;
     double xachk,rsch,rschm2m,r0m2m;
     //energy is flux at infinity, hflux is flux at horizon
     double f0,r0,fp0,vr0;
@@ -101,8 +102,8 @@ int main (void){
     //calculates zone face on other side of source
     isphf=ismhf+1;
     //sets up test value for measuring energy flux and value of wave
-    itest=imm-1;
-    itest1=floor((25.0+width-rstar0)/delrho)+1;
+    itest=im;
+    itest1=0;
     itest2=floor((50.0+width-rstar0)/delrho)+1;
     itest3=floor((200.0+width-rstar0)/delrho)+1;
     itest4=floor((400.0+width-rstar0)/delrho)+1;
@@ -152,17 +153,20 @@ int main (void){
         functions->omega2dLb[i] = pow(omega(rhob[i]),2.0)/Lfunc(rhob[i]);
         functions->omega2dLderiva[i] = H_bar_prime_rho(rhob[i]);
     }
+    fprintf(funcptr, "a, b, c, d, e, f\n");
+    for (i=0;i<=im;i+=10)
+        fprintf(funcptr,"%d, %e, %e, %e, %e, %e\n", i,rhoa[i], ra[i], xa[i],functions->boosta[i], functions->omega2dLa[i]);
     printf("%d, %d\n", ismhf, isphf);
     fclose(funcptr);
-    
-    for (lmode=1;lmode<=1;lmode++){
+    #pragma omp parallel for schedule(dynamic)
+    for (lmode=1;lmode<=20;lmode++){
         int mmode;
         for (mmode=1;mmode<=lmode;mmode++){
             char fluxfilename[20];
             sprintf(fluxfilename, "flux%02d,%02dmode.csv",lmode,mmode);
 
             FILE *forceptr=fopen("force.csv","w");
-            FILE *fluxptr=fopen(fluxfilename,"w");
+            //FILE *fluxptr=fopen(fluxfilename,"w");
             
             FILE *ryptr= fopen("energy.txt","w");
             time_t start_t, end_t;
@@ -171,7 +175,7 @@ int main (void){
             time(&start_t);
             //printf("l=%d,m=%d,thread=%d\n", lmode,mmode,omp_get_thread_num());
             //frequency by m mode
-            double pitempleft,pitempright;
+            double complex pitempleft,pitempright, ztempleft, ztempright;
             double complex * z=malloc(sizeof(double complex)*ip);
             double complex * pi=malloc(sizeof(double complex)*ip);
             double complex * phi=malloc(sizeof(double complex)*ip);
@@ -191,12 +195,13 @@ int main (void){
             double sumflux,sumflux1,sumflux2,sumflux3,sumflux4,sumflux5;
             double eaflux,eaflux1,eaflux2,eaflux3,eaflux4,eaflux5;
             double complex forcet; 
-            double sumforce;
-            double selft;
+            double complex sumforce;
+            double complex selft;
             int i,n=1,icycle=0,icyclep=0,ifilenum=0;
             double complex energyv,energyv1,energyv2,energyv3,energyv4,energyv5;
             double * energy = malloc(sizeof(double)*60000);
-            double * forcetarray = malloc(sizeof(double)*60000);
+            //double * energy1 = malloc(sizeof(double)*60000);
+            double complex * forcetarray = malloc(sizeof(double complex)*60000);
             //,energy1[60000],energy2[60000],energy3[60000];
             //double energy4[60000],energy5[60000];
             //calculates q_l_m coefficients
@@ -221,32 +226,41 @@ int main (void){
                     break;
                 vb[i]=vpotential(rb[i],rbm2m[i], xm, lmode);
             }
-            FILE *rxptr= fopen("bhpert.csv","w");
-            for (n=1;n<=ntot;n++){
+            FILE *rxptr = fopen("bhpert.csv","w");
+            double complex qlm0 = qlm * f0;
+            for (n=0;n<30;n++){
                 //calculates time
                 t=n*dt;
-                
-                
+                                    
+                if (n%10==0){
+                    printf("\r");
+                    for (i=0;i<30;i++){
+                        printf(" ");
+                    }
+                    fflush(stdout);    
+                    printf("\r%d",n);
+                    fflush(stdout); 
+                }
                 //complex functions of time that multiply delta function
                 //use logistic function to reduce transient behavior
-                //gb   = -qlm*f0*cexp(-I*omega*t)/(1.0+exp(15.0-0.5*t));
-                gb   = -qlm*f0*cexp(-I*omega*t);
+//                gb   = -qlm*f0*cexp(I*omega*t)/(1.0+exp(15.0-0.5*t));
+                gb   = -qlm*f0*cexp(-I*omega*t+I*0.5*M_PI);
                 //printf("r0=%e\n",r0);
-                //dgb  = -qlm*f0*(0.5*cexp(15.0-0.5*t-I*t*omega)/pow(1.0+exp(15-0.5*t),2.0))-(I*omega*cexp(I*omega*t)/(1.0+exp(15.0-0.5*t)));
-                dgb=I*omega*qlm*f0*cexp(-I*omega*t);
+  //              dgb  = -qlm*f0*((0.5*cexp(15.0-0.5*t+I*t*omega)/pow(1.0+exp(15-0.5*t),2.0))-(I*omega*cexp(I*omega*t)/(1.0+exp(15.0-0.5*t))));
+                dgb=I*omega*qlm*f0*cexp(-I*omega*t+I*0.5*M_PI);
                 fb   = 0.0+0.0*I;
                 dfb  = 0.0+0.0*I;
                 ddfb = 0.0+0.0*I;
                 
                 //jump conditions
                 
-                jpsi   = (1.0/pow(f0,2.0))*fb;
+                jpsi   = 0.0+0.0*I;
                 jphi   = fp0*jpsi+((1.0/f0)*gb);
                 jpi   = (1.0/pow(f0,2))*dfb;
                 jdpsi = jphi;
                 jdphi  = (1/pow(f0,2.0))*ddfb+vr0*jpsi;
                 jdpi   = fp0*jpi+(1.0/f0)*dgb;
-                
+                                
                 
                 //ghost zone variables
                 
@@ -256,13 +270,18 @@ int main (void){
                 phiagp1  =phi[isphf]-jphi-0.5*jdphi*delrho;
                 piag     =pi[ismhf]+jpi-0.5*jdpi*delrho;
                 piagp1   =pi[isphf]-jpi-0.5*jdpi*delrho;
-                
+                /* 
+                printf("pi[ismhf] before differnece %e  %e\n", creal(pi[ismhf]), cimag(pi[ismhf]));
+                printf("jpi is %e   %e\n", creal(jpi), cimag(jpi));
+                printf("jdpi is %e  %e\n", creal (jdpi), cimag(jdpi));
+                printf("piag before difference %e   %e\n", creal(piag), cimag(piag));   
+                */
                 //uses ghost zone variables to move wave forward one step
                 laxwen (im,imm,delrho,rcour,dt,z,phi,pi,va,vb,zag,zagp1,phiag,phiagp1,piag,piagp1,isphf,ismhf,za,zb,pia,pib,phib,functions);
                 fprintf(rxptr,"%d, %e, %e, %e\n",n, t, creal(z[im]), cimag(z[im]));    
                 //calculates the energy flux at the test point
                 energyv = -(pi[itest]*conj(H_bar(rhoa[itest])*phi[itest]-H(rhoa[itest])*pi[itest]))/(4.0*M_PI);
-                //energyv1 = -(pi[itest1]*conj(phi[itest1]))/(4.0*M_PI);
+                energyv1 = conj(pi[itest1])*pi[itest1]/(4.0*M_PI);
                 //energyv2 = -(pi[itest2]*conj(phi[itest2]))/(4.0*M_PI);
                 //energyv3 = -(pi[itest3]*conj(phi[itest3]))/(4.0*M_PI);
                 //energyv4 = -(pi[itest4]*conj(phi[itest4]))/(4.0*M_PI);
@@ -275,22 +294,53 @@ int main (void){
                 //energy4[n-1]=creal(energyv4);
                 //energy5[n-1]=creal(energyv5);
 
-                pitempleft=pi[ismhf]+0.5*(pi[ismhf]-pi[ismhf-1]);
-                pitempright=pi[isphf]-0.5*(pi[isphf+1]-pi[isphf]);
+                pitempleft=(pi[ismhf]+piag)*0.5;
+                pitempright=0.5*(pi[ismhf]+piagp1);
+                ztempleft=z[ismhf]+0.5*(z[ismhf]-z[ismhf-1]);
+                ztempright=z[isphf]-0.5*(z[isphf+1]-z[isphf]);
                 
-                forcet= (1/r0)*0.5*(pi[ismhf]+pi[isphf])*y(lmode,mmode,0.5*M_PI,omega*t);
-                forcetarray[n-1]=creal(forcet);
+                forcet= (1/r0)*y(lmode,mmode,0.5*M_PI,freq*t-0.5*M_PI)*(pitempright);
+                /*
+                fprintf(fluxptr,"\r%d, %e, %e\n", n, creal(forcet), cimag(forcet));   
+                fprintf(fluxptr,"%e   %e\n", creal(pi[isphf+3]), cimag(pi[isphf+3]));
+                fprintf(fluxptr,"%e   %e\n", creal(pi[isphf+2]), cimag(pi[isphf+2]));
+                fprintf(fluxptr,"%e   %e\n", creal(pi[isphf+1]), cimag(pi[isphf+1]));
+                fprintf(fluxptr,"%e   %e\n", creal(pi[isphf]), cimag(pi[isphf]));
+                fprintf(fluxptr,"%e   %e\n", creal(piag), cimag(piag));
+                fprintf(forceptr, "%d  %f   %e   %e\n", n, t, creal(forcet), cimag(forcet));
+                for (i = 0; i<=30;++i)
+                    fprintf(fluxptr,"-");
+                    fprintf(fluxptr,"\n");
+                if (n%nperiod==0){
+                    ifilenum++;
+                    char filename [20];
+                    sprintf(filename, "dn%02d,%02d,%02dmode.csv", ifilenum,lmode,mmode);
+                    FILE *dnptr= fopen(filename,"w");
+                    fprintf(dnptr,"a,b,c,d,e,\n");
+                    for (i=0;i<=im;i+=10){
+                        double pp=creal(phi[i]);
+                        double up=cimag(phi[i]);
+                        if (fabs(pp)<1e-60)
+                            pp=0.0;
+                        if (fabs(up)<1e-60)
+                            up=0.0;
+                        fprintf(dnptr,"%7d,   %10e,   %10e,   %10e,   %10e,\n",i,rhoa[i],ram2m[i],pp,up);
+                    }
+                    fclose(dnptr);
+                }
+                */
+                forcetarray[n-1]=forcet;
                 totalforcearray[n-1]+=forcet;
                 if ((n>nperiod)&&(((t0/dt)-floor(t0/dt))<1e-10)){
                     
                     int k;
                     sumflux=0.0;
-                    //sumflux1=0.0;
+                    sumflux1=0.0;
                     //sumflux2=0.0;
                     //sumflux3=0.0;
                     //sumflux4=0.0;
                     //sumflux5=0.0;
-                    sumforce=0.0;
+                    sumforce=0.0+0.0*I;
                     for(k=n-nperiod;k<=n-1;k++){
                         sumflux+=energy[k]*dt;
                         //sumflux1+=energy1[k]*dt;
@@ -308,35 +358,16 @@ int main (void){
                     //eaflux5=sumflux5/t0;
                     selft=sumforce/t0;
                 }
-                fprintf(fluxptr,"%5d,%.4f,%.12e\n",n,t,eaflux);
+                //fprintf(fluxptr,"%5d,%.4f,%+.12e, %+.12e\n",n,t,creal(selft),cimag(selft));
                 //prints values of wave and energy flux at test point to file
                 //fprintf(ryptr,"%7d,    %+e,    %+e,    %+e,\n",n,time,creal(z[itest1]),cimag(z[itest1]));
                 //routine for displaying progress on screen
-                icycle++;
-                //if (icycle>=100) {
-                //    printf("cycle= %d\n",n);
-                //    icycle=0;
-                //}
 
                 //routine that prints value of wave at constant time through various x positions
                 //does this every 2000 iterations or every 59.4 M
                 //file names titled dn##.txt, where ## is the file number
                 icyclep++;
                 if (icyclep>=2000) {
-                    ifilenum++;
-                    char filename [20];
-                    sprintf(filename, "dn%02d,%02d,%02dmode.csv", ifilenum,lmode,mmode);
-                    FILE *dnptr= fopen(filename,"w");
-                    for (i=0;i<=im;i++){
-                        double pp=creal(z[i]);
-                        double up=cimag(z[i]);
-                        if (fabs(pp)<1e-60)
-                            pp=0.0;
-                        if (fabs(up)<1e-60)
-                            up=0.0;
-                        fprintf(dnptr,"%7d,   %10e,   %10e,   %10e,   %10e,\n",i,xa[i],ra[i],pp,up);
-                    }
-                    fclose(dnptr);
                     icyclep=0;
                 }
                 //printf("eaflux=%e\n", eaflux);
@@ -346,19 +377,23 @@ int main (void){
             
             totforce+=2.0*selft;
             totflux+=2.0*eaflux;
+            //horflux+=2.0*eaflux1;
             //totflux1+=2.0*eaflux1;
             //totflux2+=2.0*eaflux2;
             //totflux3+=2.0*eaflux3;
             //totflux4+=2.0*eaflux4;
             //totflux5+=2.0*eaflux5;
             //fprintf(fluxptr,"%d     %d     %+.12e     %+.12e      %+.12e      %+.12e      %+.12e     %+.12e \n",lmode,mmode,eaflux,eaflux1,eaflux2,eaflux3,eaflux4,eaflux5);
-            printf("l=%02d,m=%02d, partial total flux=%.12e, thread=%d\n",lmode, mmode,totflux,omp_get_thread_num());
+            printf("\rl=%02d,m=%02d, thread=%d\n",lmode, mmode,omp_get_thread_num());
+            printf("mode fluxes %.12e \n", totflux);//, horflux);
+            printf("total fluxes %.12e \n",totflux);//, horflux);
             //printf("self force, time component=%.12e\n",selft);
             time(&end_t);
             diff_t = difftime(end_t, start_t);
             //printf ("Zone cycles per second = %e\n",((double) im*ntot)/diff_t);
             fclose(forceptr);
             free(energy);
+            //free(energy1);
             free(forcetarray);
             free(z);
             free(phi);
@@ -370,7 +405,7 @@ int main (void){
             free(pib);
             free(phib);
             free(va);
-            fclose(fluxptr);	
+            //fclose(fluxptr);	
             free(vb);
         }
     }
@@ -388,12 +423,10 @@ int main (void){
         fprintf(finalptr,"%5d,%+.4f,%+.12e,%+.12e\n",n,n*dt,creal(totalforcearray[n]),cimag(totalforcearray[n]));
     }
     fclose(finalptr);
-    printf("12.5M point, flux=%.12e\n",totflux);
-    printf("25.0M point, flux=%.12e\n",totflux1);
-    printf("50.0M point, flux=%.12e\n",totflux2);
-    printf("200.M point, flux=%.12e\n",totflux3);
-    printf("400.M point, flux=%.12e\n",totflux4);
-    printf("800.M point, flux=%.12e\n",totflux5);
+    printf("mode fluxes %.12e %.12e\n", totflux, horflux);
+    printf("total fluxes %.12e %.12e\n",totflux, horflux);
+
+    //printf("self force time  =%.12e\n",totforce);
 }
 
 //end of routine
@@ -527,7 +560,7 @@ double complex y(int l, int m, double theta, double phii){
 //conjugate of spherical harmonics
 double complex ystar(int l, int m, double theta, double phii){
     //printf("the l mode is %d\n", l);
-    return pow(-1,m)*y(l,-m,theta,phii);
+    return /*pow(-1,m)**/y(l,-m,theta,phii);
 
 }
 //differential equation governing r as a function of rstar
@@ -579,7 +612,6 @@ double rst2rsch (double rstar){
 void mesh (double xm,double width, double delrho,double *r0,int *im, int *imm, int *ismhf,int iwidth,double rsch0,double rstar0){
     int dim =1;
     //arrays to be used for integration
-    double r[ip],rstar[ip],rm2m[ip],Rstar[ip];
     double delRstar=0.5*delrho;
     
     //sets up the integration tool utilized by GSL.
@@ -588,10 +620,14 @@ void mesh (double xm,double width, double delrho,double *r0,int *im, int *imm, i
     double rho0 = scri_plus,  rhof = horizon; /* start and end of integration interval */
     //initializes arrays, with twice as many entries as the final a or b arrays
     //this is because so the integration happens once, with steps delrstar instead of delx
-    Rstar[0]=rho0;
     
     *im= 2*iwidth+1;
     imax      = *im*2+1;
+    double * r     = malloc(sizeof(double)*(imax+2));
+    double * rstar = malloc(sizeof(double)*(imax+2));
+    double * rm2m  = malloc(sizeof(double)*(imax+2));
+    double * Rstar = malloc(sizeof(double)*(imax+2));
+    Rstar[0]=rho0;
     //integration, evolves y from xi to x_i+1
     //qqw
     double rhoi,xi;
@@ -683,6 +719,10 @@ void mesh (double xm,double width, double delrho,double *r0,int *im, int *imm, i
         printf("All Radmesh:  All mesh points constructed satisfy tolerances\n");
     else
         printf("Radmesh:  Mesh has points not satisfying tolerances\n");
+    free(r)    ;
+    free(rstar);
+    free(rm2m) ;
+    free(Rstar);
 }
 
 
@@ -776,7 +816,7 @@ void laxwen(int im,int imm, double delrho,double rcour, double dt, double comple
             za[i]=0.5*(zb[i]+zb[i-1]);
         }
     }
-    
+ 
     double complex other=0.0+0.0*I;
     for (i=1;i<=imm;i++){
         if (i==isphf){
@@ -824,10 +864,5 @@ void laxwen(int im,int imm, double delrho,double rcour, double dt, double comple
     //more boundary conditions
     phi[0]      = phi[1]-(phi[2]-phi[1]);
     phi[im]    = phi[im-1]+(phi[im-1]-phi[im-2]);
-    
-    
-
 }
-
-    
 
